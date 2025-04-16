@@ -22,10 +22,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 ########### USER INPUT START ############
 hamfile = "wannier90_hr.dat"
-skiplines = 28
 
 # printing results up to this length.
-length_criterion = 10.0 
+length_criterion = 8.0 
 
 # Range of visualization 
 xlim = [-10,10]
@@ -79,8 +78,27 @@ print(f"Length criterion: {length_criterion} (Å)")
 
 
 # %%
+def detect_data_start_line(filename):
+    with open(filename, 'r') as f:
+        for i, line in enumerate(f):
+            parts = line.strip().split()
+            if len(parts) != 7:
+                continue
+            try:
+                int_part = [int(x) for x in parts[:5]]
+                float_part = [float(x) for x in parts[5:]]
+                return i  
+            except ValueError:
+                continue
+    raise ValueError("No valid data line found")
+
+
+
 # wannier90_har.dat to csv file
+skiplines = detect_data_start_line(hamfile)
+#print("Skipped lines:",skiplines)
 hamdata = np.loadtxt(hamfile,skiprows=skiplines)
+# This part might be changed simply
 df = pd.DataFrame(hamdata, columns=['Rx', 'Ry', 'Rz', 'index1', 'index2', 'ReH', 'ImH'])
 df['Rx'] = df['Rx'].astype(int)
 df['Ry'] = df['Ry'].astype(int)
@@ -148,9 +166,9 @@ df['Orb2']  = df['index2'].apply(lambda x: indexer.get_orb_name(x))
 
 # %%
 cart_distance = atom_pos_cart[df['Atom1'].to_numpy()-1,:] - atom_pos_cart[df['Atom2'].to_numpy()-1,:] 
-cart_distance += df['Rx'].to_numpy().reshape(-1,1) * lattice_vec[0,:] 
-cart_distance += df['Ry'].to_numpy().reshape(-1,1) * lattice_vec[1,:] 
-cart_distance += df['Rz'].to_numpy().reshape(-1,1) * lattice_vec[2,:] 
+cart_distance -= df['Rx'].to_numpy().reshape(-1,1) * lattice_vec[0,:] 
+cart_distance -= df['Ry'].to_numpy().reshape(-1,1) * lattice_vec[1,:] 
+cart_distance -= df['Rz'].to_numpy().reshape(-1,1) * lattice_vec[2,:] 
 
 #print(cart_distance)
 df = pd.concat([df, pd.DataFrame(cart_distance, columns=['rx','ry','rz'])], axis=1)
@@ -198,9 +216,9 @@ with PdfPages(pdf_filename) as pdf:
         ax[0, 1].axis("off")
         title_str = (
             f"Distance = {round(key[0],3)} Å\n"
-            f"Cell vector (Rx, Ry, Rz) = ({key[1]}, {key[2]}, {key[3]})\n"
+            f"B atom Cell index (Rx, Ry, Rz) = ({key[1]}, {key[2]}, {key[3]})\n"
             f"Cartesian vector (rx, ry, rz) = ({round(key[6],3)}, {round(key[7],3)}, {round(key[8],3)})\n"
-            f"Atomic index (A1, A2) = ({key[4]}, {key[5]})\n"
+            f"Atomic index (A, B) = ({key[4]}, {key[5]})\n"
             f"from atom {key[5]} to atom {key[4]}\n"
             f"Hamiltonian Unit: meV\n"
         )
@@ -242,14 +260,14 @@ with PdfPages(pdf_filename) as pdf:
         topview.set_ylim(ylim)
         topview.set_xlabel("X (Å)")
         topview.set_ylabel("Y (Å)")
-        points_x = [atom_pos_cart[key[5]-1,0], atom_pos_cart[key[4]-1,0]+ key[1]*lattice_vec[0,0]+ key[2]*lattice_vec[1,0]+ key[3]*lattice_vec[2,0]]
-        points_y = [atom_pos_cart[key[5]-1,1], atom_pos_cart[key[4]-1,1]+ key[1]*lattice_vec[0,1]+ key[2]*lattice_vec[1,1]+ key[3]*lattice_vec[2,1]]
+        points_x = [atom_pos_cart[key[5]-1,0], atom_pos_cart[key[4]-1,0]- key[1]*lattice_vec[0,0]- key[2]*lattice_vec[1,0]- key[3]*lattice_vec[2,0]]
+        points_y = [atom_pos_cart[key[5]-1,1], atom_pos_cart[key[4]-1,1]- key[1]*lattice_vec[0,1]- key[2]*lattice_vec[1,1]- key[3]*lattice_vec[2,1]]
         topview.scatter(points_x, points_y, color='black', s=7)
         topview.annotate(
             '',                          
             #xy=(atom_pos_cart[key[4]-1,0]+key[6], atom_pos_cart[key[4]-1,1]+key[7] ),                   
-            xy=(atom_pos_cart[key[4]-1,0]+ key[1]*lattice_vec[0,0]+ key[2]*lattice_vec[1,0]+ key[3]*lattice_vec[2,0] ,
-                atom_pos_cart[key[4]-1,1]+ key[1]*lattice_vec[0,1]+ key[2]*lattice_vec[1,1]+ key[3]*lattice_vec[2,1] ),#,           ),
+            xy=(atom_pos_cart[key[4]-1,0]- key[1]*lattice_vec[0,0]- key[2]*lattice_vec[1,0]- key[3]*lattice_vec[2,0] ,
+                atom_pos_cart[key[4]-1,1]- key[1]*lattice_vec[0,1]- key[2]*lattice_vec[1,1]- key[3]*lattice_vec[2,1] ),#,           ),
             xytext=(atom_pos_cart[key[5]-1,0], atom_pos_cart[key[5]-1,1] ),               # 화살표의 시작 점 (기준)
             arrowprops=dict(
                 arrowstyle='->',         
@@ -266,13 +284,13 @@ with PdfPages(pdf_filename) as pdf:
         sideview.set_ylim(zlim)
         sideview.set_xlabel("X (Å)")
         sideview.set_ylabel("Z (Å)")
-        points_z = [atom_pos_cart[key[5]-1,2], atom_pos_cart[key[4]-1,2]+ key[1]*lattice_vec[0,2]+ key[2]*lattice_vec[1,2]+ key[3]*lattice_vec[2,2]]
+        points_z = [atom_pos_cart[key[5]-1,2], atom_pos_cart[key[4]-1,2]- key[1]*lattice_vec[0,2]- key[2]*lattice_vec[1,2]- key[3]*lattice_vec[2,2]]
         sideview.scatter(points_x, points_z, color='black', s=7)           
         sideview.annotate(
             '',                          
             #xy=(atom_pos_cart[key[4]-1,0]+key[6], atom_pos_cart[key[4]-1,1]+key[7] ),                   
-            xy=(atom_pos_cart[key[4]-1,0]+ key[1]*lattice_vec[0,0]+ key[2]*lattice_vec[1,0]+ key[3]*lattice_vec[2,0] ,
-                atom_pos_cart[key[4]-1,2]+ key[1]*lattice_vec[0,2]+ key[2]*lattice_vec[1,2]+ key[3]*lattice_vec[2,2] ),#,           ),
+            xy=(atom_pos_cart[key[4]-1,0]- key[1]*lattice_vec[0,0]- key[2]*lattice_vec[1,0]- key[3]*lattice_vec[2,0] ,
+                atom_pos_cart[key[4]-1,2]- key[1]*lattice_vec[0,2]- key[2]*lattice_vec[1,2]- key[3]*lattice_vec[2,2] ),#,           ),
             xytext=(atom_pos_cart[key[5]-1,0], atom_pos_cart[key[5]-1,2] ),               
             arrowprops=dict(
                 arrowstyle='->',         
