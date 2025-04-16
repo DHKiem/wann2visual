@@ -46,6 +46,7 @@ projected_atompos_frac = np.matrix([
 
 # The number of groups for orbital info should be same with projected_atompos_cartesian.  
 # e.g. ["dxz", "dyz", "dxy"],
+# Wannier90 gives the order of ["s", "pz", "px", "py", "dz2", "dxz", "dyz", "dx2-y2", "dxy", "fz3", "fxz2", "fyz2", "fz(x2-y2)", "fxyz", "fx(x2-3y2)", "fy(3x2-y2)"].
 orbital_info = [
   ["pz"], 
   ["pz"],
