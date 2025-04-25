@@ -52,6 +52,9 @@ orbital_info = [
   ["pz"],
 ]
 
+# If you want to reorder the orbitals, set orbital_sort 
+#orbital_sort = orbital_info
+
 ########### USER INPUT END ############
 
 
@@ -65,10 +68,25 @@ atom_pos_cart = projected_atompos_frac * lattice_vec
 print("Lattice vector: \n",lattice_vec)
 
 for (n,orb_per_atom) in enumerate(orbital_info):
-  print("atom",n+1, ": ", orb_per_atom)
-  total_orb_num += len(orb_per_atom)
+    print("atom",n+1, ": ", orb_per_atom)
+    total_orb_num += len(orb_per_atom)
 
 print("Total number of orbitals: ", total_orb_num)
+
+def orbital_sorting_size(A, B):
+    if len(A) != len(B):
+        return False
+    for a, b in zip(A, B):
+        if len(a) != len(b):
+            return False
+    return True
+
+if 'orbital_sort' in locals():
+    print("Orbital sort is detected.")
+    assert orbital_sorting_size(orbital_info, orbital_sort), "Check orbital sort!"
+    for (n,orb_per_atom) in enumerate(orbital_sort):
+        print("atom",n+1, ": ", orb_per_atom)
+        total_orb_num += len(orb_per_atom)
 
 print("Atomic position (in Cartesian): ")
 print(atom_pos_cart)
@@ -210,6 +228,8 @@ pdf_filename = "orbital_matrices.pdf"
 with PdfPages(pdf_filename) as pdf:
     for key, group in grouped:
         pivot = group.pivot_table(index='Orb1', columns='Orb2', values='ReH')
+        if 'orbital_sort' in locals():
+            pivot = pivot.reindex(index= orbital_sort[key[4]-1] , columns= orbital_sort[key[5]-1] )
 
         fig, ax = plt.subplots(2,2,figsize=(8,4.5))
 
