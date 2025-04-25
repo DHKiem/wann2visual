@@ -1,7 +1,7 @@
 # wann2visual
 ### This code is made easily to reveal hopping parameters from wannier90 output.
 ### Author: DH Kiem (kiem.dohoon[at]gmail.com)
-### Data: 2025-Apr-3
+### Date: 2025-Apr
 ### Copyright: MIT
 ### Use: python wann2visual.py
 ```
