@@ -9,6 +9,8 @@
 # package import
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import bisect
 from matplotlib.backends.backend_pdf import PdfPages
@@ -51,6 +53,9 @@ orbital_info = [
   ["pz"], 
   ["pz"],
 ]
+
+table_font_size = '8' # number | 'auto' # default = 8
+orderby = 'hamiltonian' # 'hamiltonian' | 'distance'  # default = 'hamiltonian'
 
 # If you want to reorder the orbitals, set orbital_sort 
 #orbital_sort = orbital_info
@@ -216,20 +221,57 @@ df.to_csv(hamfile+".csv", index=False)  # Wannier90 format out
 
 grouped = df.groupby(['Distance', 'Rx', 'Ry', 'Rz', 'Atom1', 'Atom2', 'rx','ry','rz'])
 
+# Find max value of hopping
+
+grouped_maxvalues = grouped['ReH'].apply(lambda x: x.abs().max())
+sorted_hopp_groups = grouped_maxvalues.sort_values(ascending=False)
+
+
 #for key, group in grouped:
 #    print(f"\n--- Group: Distance={key[0]}, (Rx,Ry,Rz)=({key[1]},{key[2]},{key[3]}), (Atom1,Atom2)=({key[4]},{key[5]}), ---")
 #    pivot = group.pivot(index='Orb1', columns='Orb2', values='ReH')
 #    print(pivot)
 
-
-
+def is_number_string(s):
+    try:
+        float(s)  
+        return True
+    except ValueError:
+        return False
+    
+def convert_number(s):
+    try:
+        return int(s)
+    except ValueError:
+        try:
+            return float(s)
+        except ValueError:
+            return None  
 # %%
 pdf_filename = "orbital_matrices.pdf"
 with PdfPages(pdf_filename) as pdf:
-    for key, group in grouped:
+    #for key, group in grouped:
+    #for i, key in enumerate(sorted_hopp_groups.index): # for debug
+    indices = grouped.groups.keys()
+    if orderby != 'distance':        
+        indices = sorted_hopp_groups.index
+
+        
+    
+    for key in indices:
+        group = grouped.get_group(key)
         pivot = group.pivot_table(index='Orb1', columns='Orb2', values='ReH')
+        
+        ##for debug
+        #print(f"\n[{i}] Group key: {key}")
+        #print(f"Max ReH in group: {sorted_hopp_groups[key]:.5f}")
+        #print(pivot)
+
         if 'orbital_sort' in locals():
             pivot = pivot.reindex(index= orbital_sort[key[4]-1] , columns= orbital_sort[key[5]-1] )
+
+
+        hopp_max = np.nanmax(np.abs(pivot.values))
 
         fig, ax = plt.subplots(2,2,figsize=(8,4.5))
 
@@ -241,7 +283,8 @@ with PdfPages(pdf_filename) as pdf:
             f"Cartesian vector (rx, ry, rz) = ({round(key[6],3)}, {round(key[7],3)}, {round(key[8],3)})\n"
             f"Atomic index (A, B) = ({key[4]}, {key[5]})\n"
             f"from atom {key[5]} to atom {key[4]}\n"
-            f"Hamiltonian Unit: meV\n"
+            f"Largest component: {hopp_max:.3f}\n"
+            f"Unit: meV\n"           
         )
         ax[0, 1].text(0.5, 0.5, title_str,
                        ha='center', 
@@ -261,9 +304,26 @@ with PdfPages(pdf_filename) as pdf:
             loc='center'
         )
 
-        table.auto_set_font_size(False)
-        table.set_fontsize(9)
-        table.scale(0.9, 1.3)
+        if 'table_font_size' in locals():
+            if table_font_size == 'auto':
+                table.auto_set_font_size(True)
+            elif isinstance(table_font_size, (int, float)):
+                table.auto_set_font_size(False)        
+                table.set_fontsize(table_font_size)
+                table.scale(0.9, 1.3)
+            elif is_number_string(table_font_size):
+                font_size = convert_number(table_font_size)
+                table.auto_set_font_size(False)        
+                table.set_fontsize(font_size)
+                table.scale(0.9, 1.3)
+            else:
+                table.auto_set_font_size(False)        
+                table.set_fontsize(8)
+                table.scale(0.9, 1.3)
+        else:
+            table.auto_set_font_size(False)
+            table.set_fontsize(8)
+            table.scale(0.9, 1.3)
 
         for (row, col), cell in table.get_celld().items():
             cell.set_linewidth(0.3)
